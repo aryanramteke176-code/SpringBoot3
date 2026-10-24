@@ -1,0 +1,467 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linkly | URL Shortener</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #0b1020;
+            color: #f3f4f6;
+            min-height: 100vh;
+            padding: 30px 16px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        header h1 {
+            color: #8b9cff;
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #aab2c5;
+        }
+
+        .card {
+            background: #151c30;
+            border: 1px solid #29334c;
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 22px;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin-bottom: 18px;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px;
+            background: #0b1020;
+            color: white;
+            border: 1px solid #39445f;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        button {
+            background: #7185ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 17px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 4px 4px 0;
+        }
+
+        button:hover {
+            background: #586cf0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .secondary {
+            background: #303b55;
+        }
+
+        .danger {
+            background: #bd4057;
+        }
+
+        .result {
+            display: none;
+            margin-top: 18px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #0b1020;
+            overflow-wrap: anywhere;
+        }
+
+        .result a {
+            color: #9eafff;
+        }
+
+        .message {
+            margin-top: 12px;
+            color: #ff9ca8;
+            overflow-wrap: anywhere;
+        }
+
+        .success {
+            color: #76e6ad;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .stat {
+            background: #151c30;
+            border: 1px solid #29334c;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .stat p {
+            color: #aab2c5;
+            margin-bottom: 8px;
+        }
+
+        .stat strong {
+            font-size: 28px;
+            color: #9eafff;
+        }
+
+        .url-item {
+            padding: 16px 0;
+            border-bottom: 1px solid #29334c;
+            overflow-wrap: anywhere;
+        }
+
+        .url-item:last-child {
+            border-bottom: none;
+        }
+
+        .url-item p {
+            margin: 7px 0;
+            color: #b8c0d4;
+        }
+
+        .empty {
+            color: #aab2c5;
+        }
+
+        @media (max-width: 600px) {
+            header h1 {
+                font-size: 29px;
+            }
+
+            .card {
+                padding: 18px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <header>
+        <h1>🔗 Linkly</h1>
+        <p>Make long URLs short, simple, and shareable.</p>
+    </header>
+
+    <div class="stats">
+        <div class="stat">
+            <p>Total URLs</p>
+            <strong id="totalUrls">—</strong>
+        </div>
+        <div class="stat">
+            <p>Total Short Paths</p>
+            <strong id="totalPaths">—</strong>
+        </div>
+    </div>
+
+    <section class="card">
+        <h2>Shorten URL</h2>
+
+        <form id="shortenForm">
+            <input
+                    type="url"
+                    id="originalUrl"
+                    placeholder="https://example.com/your-long-url"
+                    required
+            >
+            <button type="submit" id="shortenButton">
+                Shorten URL
+            </button>
+        </form>
+
+        <div class="result" id="shortenResult">
+            <p class="success">Your shortened URL:</p>
+            <p id="shortUrlText"></p>
+            <button type="button" id="copyButton">Copy URL</button>
+        </div>
+
+        <p class="message" id="shortenMessage"></p>
+    </section>
+
+    <section class="card">
+        <h2>Find URL by Short Path</h2>
+
+        <form id="lookupForm">
+            <input
+                    type="text"
+                    id="shortPath"
+                    placeholder="Enter short path"
+                    required
+            >
+            <button type="submit">Find URL</button>
+        </form>
+
+        <div id="lookupResult" class="result"></div>
+        <p id="lookupMessage" class="message"></p>
+    </section>
+
+    <section class="card">
+        <h2>All Shortened URLs</h2>
+        <button type="button" id="refreshButton">Refresh URLs</button>
+        <div id="urlList" style="margin-top: 15px;"></div>
+        <p id="listMessage" class="message"></p>
+    </section>
+
+    <section class="card">
+        <h2>All Short Paths</h2>
+        <button type="button" id="pathsButton">Load Paths</button>
+        <div id="pathsList" style="margin-top: 15px;"></div>
+        <p id="pathsMessage" class="message"></p>
+    </section>
+
+</div>
+
+<script>
+    // Uses the same host and port as the page.
+    const API = "/api/urlshortner";
+
+    const $ = (id) => document.getElementById(id);
+
+    // Display API errors instead of failing silently.
+    async function request(url, options = {}) {
+        const response = await fetch(url, options);
+        const body = await response.text();
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}: ${body || response.statusText}`
+            );
+        }
+
+        return body;
+    }
+
+    function showMessage(id, message, success = false) {
+        $(id).textContent = message;
+        $(id).className = success
+            ? "message success"
+            : "message";
+    }
+
+    async function loadUrls() {
+        try {
+            showMessage("listMessage", "");
+
+            const body = await request(API);
+            const urls = JSON.parse(body);
+
+            $("totalUrls").textContent = urls.length;
+            $("urlList").replaceChildren();
+
+            if (urls.length === 0) {
+                $("urlList").innerHTML =
+                    '<p class="empty">No URLs saved yet.</p>';
+                return;
+            }
+
+            urls.forEach((url) => {
+                const item = document.createElement("div");
+                item.className = "url-item";
+
+                const shortUrl = `${window.location.origin}/${url.path}`;
+
+                const title = document.createElement("strong");
+                title.textContent = shortUrl;
+
+                const original = document.createElement("p");
+                original.textContent = `Original URL: ${url.originalUrl}`;
+
+                const path = document.createElement("p");
+                path.textContent = `Path: ${url.path}`;
+
+                const copy = document.createElement("button");
+                copy.textContent = "Copy";
+                copy.onclick = () => copyText(shortUrl);
+
+                const remove = document.createElement("button");
+                remove.textContent = "Delete";
+                remove.className = "danger";
+                remove.onclick = () => deleteUrl(url.id);
+
+                item.append(title, original, path, copy, remove);
+                $("urlList").appendChild(item);
+            });
+        } catch (error) {
+            showMessage("listMessage", error.message);
+        }
+    }
+
+    async function loadPaths() {
+        try {
+            showMessage("pathsMessage", "");
+
+            const body = await request(`${API}/paths`);
+            const paths = JSON.parse(body);
+
+            $("totalPaths").textContent = paths.length;
+            $("pathsList").replaceChildren();
+
+            if (paths.length === 0) {
+                $("pathsList").innerHTML =
+                    '<p class="empty">No paths found.</p>';
+                return;
+            }
+
+            paths.forEach((path) => {
+                const item = document.createElement("div");
+                item.className = "url-item";
+
+                const link = document.createElement("a");
+                link.href = `${window.location.origin}/${path}`;
+                link.textContent = path;
+                link.style.color = "#9eafff";
+
+                const copy = document.createElement("button");
+                copy.textContent = "Copy";
+                copy.onclick = () => copyText(link.href);
+
+                item.append(link, copy);
+                $("pathsList").appendChild(item);
+            });
+        } catch (error) {
+            showMessage("pathsMessage", error.message);
+        }
+    }
+
+    $("shortenForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const originalUrl = $("originalUrl").value.trim();
+        const button = $("shortenButton");
+
+        button.disabled = true;
+        button.textContent = "Shortening...";
+        $("shortenResult").style.display = "none";
+        showMessage("shortenMessage", "");
+
+        try {
+            // Matches @PostMapping("/shorten")
+            // and @RequestParam String originalUrl.
+            const url = `${API}/shorten?originalUrl=${
+                encodeURIComponent(originalUrl)
+            }`;
+
+            const shortUrl = await request(url, {
+                method: "POST"
+            });
+
+            $("shortUrlText").textContent = shortUrl.trim();
+            $("shortenResult").style.display = "block";
+            showMessage("shortenMessage", "URL shortened successfully!", true);
+
+            await loadUrls();
+            await loadPaths();
+        } catch (error) {
+            showMessage(
+                "shortenMessage",
+                `Could not shorten URL: ${error.message}`
+            );
+        } finally {
+            button.disabled = false;
+            button.textContent = "Shorten URL";
+        }
+    });
+
+    $("copyButton").addEventListener("click", () => {
+        copyText($("shortUrlText").textContent);
+    });
+
+    $("lookupForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const path = $("shortPath").value.trim();
+        $("lookupResult").style.display = "none";
+        showMessage("lookupMessage", "");
+
+        try {
+            const body = await request(
+                `${API}/${encodeURIComponent(path)}`
+            );
+
+            const url = JSON.parse(body);
+
+            $("lookupResult").textContent =
+                `Path: ${url.path} | Original URL: ${url.originalUrl}`;
+
+            $("lookupResult").style.display = "block";
+        } catch (error) {
+            showMessage("lookupMessage", error.message);
+        }
+    });
+
+    async function deleteUrl(id) {
+        if (!confirm("Are you sure you want to delete this URL?")) {
+            return;
+        }
+
+        try {
+            await request(`${API}/${id}`, {
+                method: "DELETE"
+            });
+
+            await loadUrls();
+            await loadPaths();
+            showMessage("listMessage", "URL deleted successfully.", true);
+        } catch (error) {
+            showMessage("listMessage", error.message);
+        }
+    }
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            alert("Copied to clipboard!");
+        } catch {
+            prompt("Copy this URL:", text);
+        }
+    }
+
+    $("refreshButton").addEventListener("click", loadUrls);
+    $("pathsButton").addEventListener("click", loadPaths);
+
+    // Load saved data when the page opens.
+    loadUrls();
+    loadPaths();
+</script>
+</body>
+</html>

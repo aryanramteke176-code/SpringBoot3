@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linkly | URL Shortener</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#0b0b14;color:#f8f7ff;min-height:100vh}
+.container{width:min(1050px,92%);margin:auto}
+nav{padding:25px 0;display:flex;justify-content:space-between}
+.logo{font-size:27px;font-weight:800;color:white;text-decoration:none}
+.logo span,h1 span{color:#b8a1ff}
+nav a{color:#b8a1ff;text-decoration:none}
+.hero{text-align:center;padding:65px 0 45px}
+h1{font-size:clamp(38px,6vw,65px);margin:20px 0}
+p{color:#aaaabe;line-height:1.7}
+form,.card,.table-card{background:#151522;border:1px solid #303047;border-radius:16px;padding:20px}
+form{display:flex;gap:10px;margin:30px auto;max-width:800px}
+input{background:#0d0d18;color:white;border:1px solid #39394e;border-radius:9px;padding:14px;width:100%;min-width:0}
+button{cursor:pointer;border:0;border-radius:9px;padding:13px 16px;background:#8255ee;color:white;font-weight:bold;white-space:nowrap}
+button:disabled{opacity:.6;cursor:wait}
+section.content{padding:25px 0 65px}
+h2{margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.card h3{margin-bottom:8px}
+.card p{font-size:13px;margin-bottom:18px}
+.card input{margin:8px 0 12px}
+.card button{width:100%}
+.output{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px;color:#b8a1ff;font-size:14px}
+.table-card{margin-top:22px}
+.table-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;text-align:left}
+th,td{padding:13px 10px;border-bottom:1px solid #303047;font-size:13px}
+th{color:#aaaabe}
+td a{color:#b8a1ff}
+.notice{margin:15px auto;overflow-wrap:anywhere}
+.error{color:#fca5a5!important}
+.success{color:#86efac!important}
+@media(max-width:650px){.grid{grid-template-columns:1fr}form{flex-wrap:wrap}.table-heading{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<nav class="container">
+  <a class="logo" href="/">link<span>ly.</span></a>
+  <a href="#dashboard">Dashboard</a>
+</nav>
+
+<header class="hero container">
+  <p>✦ SIMPLE LINKS. BIG POSSIBILITIES.</p>
+  <h1>Your links,<br>just a little <span>shorter.</span></h1>
+  <p>Create clean, shareable links with Linkly.</p>
+  <form id="shortenForm">
+    <input id="originalUrl" type="url" placeholder="https://example.com/your-long-url" required>
+    <button id="shortenButton" type="submit">Shorten URL ↗</button>
+  </form>
+  <p id="notice" class="notice" aria-live="polite"></p>
+  <p id="shortResult"></p>
+</header>
+
+<main class="container content" id="dashboard">
+  <h2>Link Management</h2>
+  <div class="grid">
+    <article class="card">
+      <h3>Save a URL</h3><p>Create and store a short link.</p>
+      <input id="saveUrl" type="url" placeholder="https://example.com" />
+      <button id="saveButton">Save URL</button>
+      <div class="output" id="saveOutput"></div>
+    </article>
+
+    <article class="card">
+      <h3>Find by Path</h3><p>Look up a saved URL by its short path.</p>
+      <input id="findPath" placeholder="Enter short path" />
+      <button id="findButton">Find URL</button>
+      <div class="output" id="findOutput"></div>
+    </article>
+
+    <article class="card">
+      <h3>All Short Paths</h3><p>Get the paths stored by the backend.</p>
+      <button id="pathsButton">Load Paths</button>
+      <div class="output" id="pathsOutput"></div>
+    </article>
+
+    <article class="card">
+      <h3>Delete a URL</h3><p>Delete a record using its database ID.</p>
+      <input id="deleteId" type="number" min="1" placeholder="Record ID" />
+      <button id="deleteButton">Delete URL</button>
+      <div class="output" id="deleteOutput"></div>
+    </article>
+  </div>
+
+  <section class="table-card">
+    <div class="table-heading">
+      <div><h2>Saved URLs</h2><p>Records loaded from your backend database.</p></div>
+      <button id="refreshButton">↻ Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Original URL</th><th>Short Path</th><th>Size</th><th>Action</th></tr></thead>
+        <tbody id="urlRows"><tr><td colspan="5">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const API = "http://localhost:8080/api/urlshortner";
+
+const $ = id => document.getElementById(id);
+
+function message(id, text, isError = false) {
+  const el = $(id);
+  el.textContent = text;
+  el.className = "output" + (isError ? " error" : " success");
+}
+
+async function request(url, options = {}) {
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      "Cannot reach backend. Open this page at http://localhost:8080 and ensure Spring Boot is running on port 8080."
+    );
+  }
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(body || `HTTP ${response.status}`);
+  }
+
+  if (!body) return null;
+  try { return JSON.parse(body); }
+  catch { return body; }
+}
+
+function shortenRequest(url) {
+  return request(
+    `${API}/shorten?originalUrl=${encodeURIComponent(url)}`,
+    { method: "POST" }
+  );
+}
+
+function shortLink(path) {
+  return `http://localhost:8080/${encodeURIComponent(path)}`;
+}
+
+$("shortenForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const url = $("originalUrl").value.trim();
+  const button = $("shortenButton");
+  button.disabled = true;
+  button.textContent = "Shortening...";
+  $("notice").textContent = "";
+  $("shortResult").textContent = "";
+
+  try {
+    const result = await shortenRequest(url);
+    const shortUrl = String(result);
+    $("shortResult").replaceChildren();
+    const link = document.createElement("a");
+    link.href = shortUrl;
+    link.textContent = shortUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    $("shortResult").append(link);
+
+    const copy = document.createElement("button");
+    copy.textContent = "Copy";
+    copy.style.marginLeft = "10px";
+    copy.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(shortUrl);
+        $("notice").textContent = "Copied!";
+      } catch {
+        $("notice").textContent = "Select and copy the link manually.";
+      }
+    };
+    $("shortResult").append(copy);
+    $("notice").textContent = "URL saved successfully.";
+    $("notice").className = "notice success";
+    await loadUrls();
+  } catch (error) {
+    $("notice").textContent = error.message;
+    $("notice").className = "notice error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Shorten URL ↗";
+  }
+});
+
+$("saveButton").onclick = async () => {
+  const url = $("saveUrl").value.trim();
+  if (!url) return message("saveOutput", "Enter a URL first.", true);
+  try {
+    const result = await shortenRequest(url);
+    message("saveOutput", `Saved: ${result}`);
+    await loadUrls();
+  } catch (error) {
+    message("saveOutput", error.message, true);
+  }
+};
+
+$("findButton").onclick = async () => {
+  const path = $("findPath").value.trim().replace(/^\/+/, "");
+  if (!path) return message("findOutput", "Enter a short path.", true);
+  try {
+    const result = await request(`${API}/${encodeURIComponent(path)}`);
+    if (!result || typeof result !== "object" || !result.path) {
+      return message("findOutput", "No matching record found.", true);
+    }
+    message("findOutput",
+      `ID: ${result.id}\nPath: ${result.path}\nOriginal URL: ${result.originalUrl}\nSize: ${result.size}`);
+  } catch (error) {
+    message("findOutput", error.message, true);
+  }
+};
+
+$("pathsButton").onclick = async () => {
+  try {
+    const paths = await request(`${API}/paths`);
+    message("pathsOutput",
+      Array.isArray(paths) && paths.length ? paths.join("\n") : "No paths found.");
+  } catch (error) {
+    message("pathsOutput", error.message, true);
+  }
+};
+
+async function deleteRecord(id, outputId = "deleteOutput") {
+  if (!id || !Number.isInteger(Number(id)) || Number(id) < 1) {
+    message(outputId, "Enter a valid positive record ID.", true);
+    return;
+  }
+  if (!confirm(`Delete database record #${id}?`)) return;
+
+  try {
+    await request(`${API}/${encodeURIComponent(id)}`, { method: "DELETE" });
+    message(outputId, `Record #${id} deleted.`);
+    await loadUrls();
+  } catch (error) {
+    message(outputId, error.message, true);
+  }
+}
+
+$("deleteButton").onclick = () => deleteRecord($("deleteId").value);
+$("refreshButton").onclick = loadUrls;
+
+async function loadUrls() {
+  const tbody = $("urlRows");
+  tbody.replaceChildren();
+
+  try {
+    const records = await request(API);
+    if (!Array.isArray(records) || records.length === 0) {
+      const row = tbody.insertRow();
+      row.insertCell().textContent = "No saved URLs yet.";
+      row.cells[0].colSpan = 5;
+      return;
+    }
+
+    records.forEach(record => {
+      const row = tbody.insertRow();
+      [record.id, record.originalUrl, record.path, record.size].forEach(value => {
+        const cell = row.insertCell();
+        cell.textContent = value == null ? "" : String(value);
+      });
+
+      const action = row.insertCell();
+      const button = document.createElement("button");
+      button.textContent = "Delete";
+      button.onclick = () => deleteRecord(record.id, "notice");
+      action.append(button);
+    });
+  } catch (error) {
+    const row = tbody.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 5;
+    cell.textContent = error.message;
+    cell.className = "error";
+  }
+}
+
+loadUrls();
+</script>
+</body>
+</html>
